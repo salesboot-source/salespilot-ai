@@ -1,0 +1,50 @@
+import { NextRequest } from 'next/server';
+import { getDb } from '@/lib/db';
+import { getUserIdFromRequest, unauthorized } from '@/lib/auth-server';
+import { generateWhatsApp, ResearchOutput } from '@/lib/ai';
+
+export async function POST(request: NextRequest) {
+  try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return unauthorized();
+
+    const body = await request.json();
+    const { research_id } = body;
+
+    if (!research_id) {
+      return Response.json({ success: false, message: 'Research ID is required.', errors: null }, { status: 422 });
+    }
+
+    const sql = getDb();
+
+    const research = await sql`SELECT * FROM research_reports WHERE id = ${research_id} AND user_id = ${userId}`;
+    if (research.length === 0) {
+      return Response.json({ success: false, message: 'Research not found.', errors: null }, { status: 404 });
+    }
+
+    const profiles = await sql`SELECT * FROM company_profiles WHERE user_id = ${userId}`;
+    const profile = profiles[0];
+    const myCompany = profile ? profile.company_name : 'Our company';
+    const myProducts = profile?.products_services
+      ? (profile.products_services as Array<{name: string; description: string}>).map((p) => `${p.name}: ${p.description}`).join('; ')
+      : 'Our services';
+
+    const message = await generateWhatsApp({
+      research: research[0].output as unknown as ResearchOutput,
+      company_name: research[0].company_name,
+      my_company: myCompany,
+      my_products: myProducts,
+    });
+
+    const result = await sql`
+      INSERT INTO whatsapp_messages (user_id, research_id, company_name, message)
+      VALUES (${userId}, ${research_id}, ${research[0].company_name}, ${message})
+      RETURNING *
+    `;
+
+    return Response.json({ success: true, message: 'Message ready!', data: result[0] }, { status: 201 });
+  } catch (error) {
+    console.error('WhatsApp error:', error);
+    return Response.json({ success: false, message: "We couldn't generate the message. Please try again.", errors: null }, { status: 500 });
+  }
+}

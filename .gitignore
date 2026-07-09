@@ -1,0 +1,28 @@
+# Node
+node_modules/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Backend
+backend/vendor/
+backend/.env
+backend/storage/logs/
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Build
+.vercel
