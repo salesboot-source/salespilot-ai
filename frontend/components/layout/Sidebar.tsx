@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '⌂' },
   { href: '/companies', label: 'Companies', icon: '◎' },
-  { href: '/research', label: 'AI Research', icon: '🔍' },
+  { href: '/research', label: 'AI Intelligence', icon: '🔍' },
   { href: '/company-profile', label: 'My Business', icon: '◈' },
 ];
 

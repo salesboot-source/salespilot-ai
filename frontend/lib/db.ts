@@ -65,6 +65,29 @@ export async function initDb() {
     )
   `;
 
+  // New: Full Intelligence Reports table
+  await sql`
+    CREATE TABLE IF NOT EXISTS company_reports (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      target_company_id UUID REFERENCES target_companies(id) ON DELETE SET NULL,
+      company_name VARCHAR(200) NOT NULL,
+      website VARCHAR(500),
+      industry VARCHAR(255),
+      country VARCHAR(100),
+      input JSONB,
+      output JSONB NOT NULL,
+      opportunity_score INTEGER DEFAULT 0,
+      buying_intent VARCHAR(20) DEFAULT 'Medium',
+      digital_maturity INTEGER DEFAULT 0,
+      ai_model VARCHAR(50) DEFAULT 'gpt-4o-mini',
+      prompt_version VARCHAR(20) DEFAULT '1.0',
+      version INTEGER DEFAULT 1,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS proposals (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

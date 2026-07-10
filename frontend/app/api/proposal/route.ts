@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getUserIdFromRequest, unauthorized } from '@/lib/auth-server';
-import { generateProposal, ResearchOutput } from '@/lib/ai';
+import { generateProposal, IntelligenceReport, ResearchOutput } from '@/lib/ai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +17,14 @@ export async function POST(request: NextRequest) {
 
     const sql = getDb();
 
-    // Get research
-    const research = await sql`SELECT * FROM research_reports WHERE id = ${research_id} AND user_id = ${userId}`;
+    // Try new company_reports table first
+    let research = await sql`SELECT * FROM company_reports WHERE id = ${research_id} AND user_id = ${userId}`;
+    
+    // Fallback to legacy research_reports
+    if (research.length === 0) {
+      research = await sql`SELECT * FROM research_reports WHERE id = ${research_id} AND user_id = ${userId}`;
+    }
+
     if (research.length === 0) {
       return Response.json({ success: false, message: 'Research not found.', errors: null }, { status: 404 });
     }
@@ -33,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Generate proposal
     const content = await generateProposal({
-      research: research[0].output as unknown as ResearchOutput,
+      research: research[0].output as unknown as (IntelligenceReport | ResearchOutput),
       company_name: research[0].company_name,
       my_company: myCompany,
       my_products: myProducts,
