@@ -9,6 +9,7 @@ const navItems = [
   { href: '/prospect-discovery', label: 'Prospect Discovery', icon: DiscoveryIcon, starred: true },
   { href: '/research', label: 'AI Intelligence', icon: AIIcon },
   { href: '/companies', label: 'Workspace', icon: CompaniesIcon },
+  { href: '/pricing', label: 'Pricing', icon: PricingIcon },
   { href: '/company-profile', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -113,6 +114,16 @@ function CompaniesIcon({ active }: { active: boolean }) {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-indigo-400' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]'}>
       <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
       <path d="M5 7h6M5 10h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function PricingIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-indigo-400' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]'}>
+      <rect x="2" y="4" width="12" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M2 7h12" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M5 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   );
 }
