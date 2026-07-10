@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-  { href: '/research', label: 'AI Engine', icon: AIIcon },
-  { href: '/companies', label: 'Companies', icon: CompaniesIcon },
+  { href: '/dashboard', label: 'Home', icon: DashboardIcon },
+  { href: '/prospect-discovery', label: 'Prospect Discovery', icon: DiscoveryIcon, starred: true },
+  { href: '/research', label: 'AI Intelligence', icon: AIIcon },
+  { href: '/companies', label: 'Workspace', icon: CompaniesIcon },
   { href: '/company-profile', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -46,6 +47,9 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             >
               <Icon active={isActive} />
               {item.label}
+              {'starred' in item && item.starred && (
+                <span className="ml-auto text-[10px] text-amber-400">★</span>
+              )}
             </Link>
           );
         })}
@@ -81,6 +85,16 @@ function DashboardIcon({ active }: { active: boolean }) {
       <rect x="9" y="1" width="6" height="6" rx="2" stroke="currentColor" strokeWidth="1.5"/>
       <rect x="1" y="9" width="6" height="6" rx="2" stroke="currentColor" strokeWidth="1.5"/>
       <rect x="9" y="9" width="6" height="6" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
+function DiscoveryIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-indigo-400' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]'}>
+      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M7 5v4M5 7h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   );
 }
