@@ -24,7 +24,28 @@ export interface ProspectResult {
   estimated_deal_value_max: number;
   confidence: number;
   signals: ProspectSignals;
+  // Ideal Client Match (v0.5.1)
+  ideal_client_match?: IdealClientMatch;
   created_at?: string;
+}
+
+export interface IdealClientMatch {
+  score: number; // 0-100
+  closing_chance: number; // 0-100
+  reasons: string[]; // Why this company is recommended
+  match_breakdown: MatchBreakdown;
+  is_top_10: boolean;
+}
+
+export interface MatchBreakdown {
+  industry_match: number; // 0-100
+  service_match: number; // 0-100
+  technology_match: number; // 0-100
+  revenue_match: number; // 0-100
+  location_match: number; // 0-100
+  budget_match: number; // 0-100
+  growth_match: number; // 0-100
+  urgency_match: number; // 0-100
 }
 
 export interface ProspectScores {
@@ -76,9 +97,23 @@ export interface DiscoveryInsights {
 
 export type SortCriterion =
   | 'opportunity'
+  | 'match'
+  | 'closing_chance'
   | 'revenue'
   | 'buying_intent'
   | 'newest'
   | 'employees'
   | 'digital_gap'
   | 'ai_rating';
+
+export interface UserProfile {
+  company_name: string;
+  industry: string;
+  services: string[];
+  target_market?: string;
+  preferred_countries?: string[];
+  preferred_cities?: string[];
+  preferred_technology?: string[];
+  min_project_value?: number;
+  preferred_client_size?: string[];
+}

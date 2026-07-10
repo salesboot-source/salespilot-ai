@@ -3,6 +3,8 @@ import { getDb } from '@/lib/db';
 import { getUserIdFromRequest, unauthorized } from '@/lib/auth-server';
 import { discoverProspects } from '@/lib/discovery/ai-discovery';
 import { initDiscoveryTables } from '@/lib/discovery/db';
+import { computeClientMatch } from '@/lib/discovery/match-engine';
+import type { UserProfile } from '@/lib/discovery/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,11 +51,21 @@ export async function POST(request: NextRequest) {
     const searchId = searchResult[0].id;
 
     // Run AI discovery
-    const prospects = await discoverProspects({
+    const rawProspects = await discoverProspects({
       query: query.trim(),
       user_services: userServices,
       user_industry: userIndustry,
     });
+
+    // Run Ideal Client Match Engine
+    const userProfile: UserProfile = {
+      company_name: profile?.company_name || '',
+      industry: userIndustry || '',
+      services: userServices || [],
+      target_market: profile?.target_market || undefined,
+    };
+
+    const prospects = await computeClientMatch(rawProspects, userProfile);
 
     // Persist results
     for (const p of prospects) {

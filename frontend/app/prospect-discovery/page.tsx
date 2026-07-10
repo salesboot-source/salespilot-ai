@@ -101,7 +101,13 @@ function ProspectCard({ prospect, index, onSave }: { prospect: ProspectResult; i
       </div>
 
       {/* Scores row */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-5 gap-2 mb-3">
+        {prospect.ideal_client_match && (
+          <div className="text-center p-2 rounded-lg bg-gradient-to-b from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
+            <div className="text-sm font-bold text-indigo-400">{prospect.ideal_client_match.score}</div>
+            <div className="text-[9px] text-indigo-400/70 uppercase">Match</div>
+          </div>
+        )}
         <div className="text-center p-2 rounded-lg bg-[var(--bg-tertiary)]">
           <div className={`text-sm font-bold ${scoreColor(s.opportunity_score)}`}>{s.opportunity_score}</div>
           <div className="text-[9px] text-[var(--text-tertiary)] uppercase">Opportunity</div>
@@ -122,8 +128,20 @@ function ProspectCard({ prospect, index, onSave }: { prospect: ProspectResult; i
         </div>
       </div>
 
-      {/* Reasoning */}
-      <p className="text-[11px] text-[var(--text-secondary)] mb-3">{prospect.reasoning}</p>
+      {/* Reasoning + Match reasons */}
+      <p className="text-[11px] text-[var(--text-secondary)] mb-2">{prospect.reasoning}</p>
+      {prospect.ideal_client_match && prospect.ideal_client_match.reasons.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {prospect.ideal_client_match.reasons.map((r, i) => (
+            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">✓ {r}</span>
+          ))}
+          {prospect.ideal_client_match.closing_chance > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400">
+              {prospect.ideal_client_match.closing_chance}% closing chance
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tech + Services */}
       <div className="flex flex-wrap gap-1 mb-3">
@@ -259,7 +277,7 @@ function DiscoveryContent() {
   const [prospects, setProspects] = useState<ProspectResult[]>([]);
   const [insights, setInsights] = useState<DiscoveryInsights | null>(null);
   const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
-  const [sortBy, setSortBy] = useState<SortCriterion>('opportunity');
+  const [sortBy, setSortBy] = useState<SortCriterion>('match');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -303,6 +321,8 @@ function DiscoveryContent() {
   // Sort
   const sorted = [...prospects].sort((a, b) => {
     switch (sortBy) {
+      case 'match': return (b.ideal_client_match?.score || 0) - (a.ideal_client_match?.score || 0);
+      case 'closing_chance': return (b.ideal_client_match?.closing_chance || 0) - (a.ideal_client_match?.closing_chance || 0);
       case 'opportunity': return b.scores.opportunity_score - a.scores.opportunity_score;
       case 'revenue': return (b.estimated_deal_value_max || 0) - (a.estimated_deal_value_max || 0);
       case 'buying_intent': return intentVal(b.scores.buying_intent) - intentVal(a.scores.buying_intent);
@@ -367,16 +387,42 @@ function DiscoveryContent() {
 
         {prospects.length > 0 && (
           <>
+            {/* TOP 10 BEST CLIENTS */}
+            {sorted.filter(p => p.ideal_client_match?.is_top_10).length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-amber-400 text-lg">⭐</span>
+                  <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Top 10 Best Clients For You</h2>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400">AI Curated</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-tertiary)] mb-4">
+                  If you only contact 10 companies this week, these give you the highest chance of winning.
+                </p>
+                <div className="space-y-3">
+                  {sorted
+                    .filter(p => p.ideal_client_match?.is_top_10)
+                    .sort((a, b) => (b.ideal_client_match?.score || 0) - (a.ideal_client_match?.score || 0))
+                    .map((p, i) => (
+                      <ProspectCard key={`top-${p.company_name}-${i}`} prospect={p} index={i} onSave={() => handleSave(p)} />
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* ALL RESULTS */}
+            <div className="border-t border-[var(--border-subtle)] pt-6">
             {/* Sort bar */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-[12px] text-[var(--text-tertiary)]">{prospects.length} companies found</span>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {([
+                  ['match', 'Best Match'],
                   ['opportunity', 'Opportunity'],
+                  ['closing_chance', 'Closing %'],
                   ['revenue', 'Revenue'],
                   ['buying_intent', 'Intent'],
                   ['digital_gap', 'Digital Gap'],
-                  ['ai_rating', 'Rating'],
                 ] as [SortCriterion, string][]).map(([key, label]) => (
                   <button key={key} onClick={() => setSortBy(key)}
                     className={`text-[10px] px-2.5 py-1 rounded-lg transition-colors ${sortBy === key ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent'}`}>
@@ -391,6 +437,7 @@ function DiscoveryContent() {
               {sorted.map((p, i) => (
                 <ProspectCard key={`${p.company_name}-${i}`} prospect={p} index={i} onSave={() => handleSave(p)} />
               ))}
+            </div>
             </div>
           </>
         )}
