@@ -318,6 +318,16 @@ function DiscoveryContent() {
     }
   };
 
+  const handleDeleteSearch = async (searchId: string) => {
+    try {
+      await api.delete(`/discover?id=${searchId}`);
+      setHistory(prev => prev.filter(h => h.id !== searchId));
+      toast('success', 'Search deleted');
+    } catch (err) {
+      toast('error', (err as ApiError).message || 'Failed to delete');
+    }
+  };
+
   // Sort
   const sorted = [...prospects].sort((a, b) => {
     switch (sortBy) {
@@ -450,19 +460,27 @@ function DiscoveryContent() {
             </div>
             <div className="divide-y divide-[var(--border-subtle)]">
               {history.slice(0, 5).map(h => (
-                <button key={h.id} onClick={() => { setQuery(h.keyword); handleSearch(h.keyword); }}
-                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors">
-                  <div className="flex items-center gap-3">
+                <div key={h.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors group">
+                  <button onClick={() => { setQuery(h.keyword); handleSearch(h.keyword); }} className="flex items-center gap-3 flex-1 text-left">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)]">
                       <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
                     </svg>
                     <span className="text-[13px] text-[var(--text-primary)]">{h.keyword}</span>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-3">
                     <span className="text-[11px] text-[var(--text-tertiary)]">{h.companies_found_count} companies</span>
                     <span className="text-[10px] text-[var(--text-tertiary)]">{new Date(h.search_date).toLocaleDateString()}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteSearch(h.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-400 transition-all"
+                      aria-label="Delete search"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
+                      </svg>
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>

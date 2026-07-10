@@ -164,3 +164,30 @@ export async function GET(request: NextRequest) {
     return Response.json({ success: false, message: 'Failed to load history' }, { status: 500 });
   }
 }
+
+// DELETE: Remove search history entry
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return unauthorized();
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return Response.json({ success: false, message: 'Search ID required' }, { status: 422 });
+    }
+
+    await initDiscoveryTables();
+    const sql = getDb();
+
+    // Delete prospect results first (foreign key), then search history
+    await sql`DELETE FROM prospect_results WHERE search_id = ${id} AND user_id = ${userId}`;
+    await sql`DELETE FROM search_history WHERE id = ${id} AND user_id = ${userId}`;
+
+    return Response.json({ success: true, message: 'Search deleted' });
+  } catch (error) {
+    console.error('Delete search error:', error);
+    return Response.json({ success: false, message: 'Failed to delete' }, { status: 500 });
+  }
+}
