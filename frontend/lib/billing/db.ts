@@ -85,8 +85,35 @@ export async function initBillingTables() {
     DO $$ BEGIN
       ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_id VARCHAR(20) DEFAULT 'free';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30) DEFAULT 'free';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS subscription_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      subscription_id UUID NOT NULL,
+      previous_state VARCHAR(30),
+      new_state VARCHAR(30) NOT NULL,
+      reason VARCHAR(200) NOT NULL,
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      usage_type VARCHAR(30) NOT NULL,
+      current_count INTEGER NOT NULL DEFAULT 0,
+      cycle_start TIMESTAMP NOT NULL DEFAULT NOW(),
+      cycle_end TIMESTAMP NOT NULL DEFAULT NOW() + INTERVAL '30 days',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user_id, usage_type)
+    )
   `;
 
   await sql`CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id)`;
