@@ -65,7 +65,7 @@ export async function initDb() {
     )
   `;
 
-  // New: Full Intelligence Reports table
+  // Full Intelligence Reports table (v0.4 with revenue scoring)
   await sql`
     CREATE TABLE IF NOT EXISTS company_reports (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,13 +80,26 @@ export async function initDb() {
       opportunity_score INTEGER DEFAULT 0,
       buying_intent VARCHAR(20) DEFAULT 'Medium',
       digital_maturity INTEGER DEFAULT 0,
+      revenue_potential INTEGER DEFAULT 0,
+      deal_size_min INTEGER DEFAULT 0,
+      deal_size_max INTEGER DEFAULT 0,
+      urgency_score INTEGER DEFAULT 0,
+      decision_maker_confidence INTEGER DEFAULT 0,
+      competition_risk INTEGER DEFAULT 0,
+      ai_verdict_stars INTEGER DEFAULT 0,
+      ai_verdict_label VARCHAR(30) DEFAULT 'Skip',
       ai_model VARCHAR(50) DEFAULT 'gpt-4o-mini',
-      prompt_version VARCHAR(20) DEFAULT '1.0',
+      prompt_version VARCHAR(20) DEFAULT '2.0',
       version INTEGER DEFAULT 1,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `;
+
+  // Performance indexes for dashboard queries
+  await sql`CREATE INDEX IF NOT EXISTS idx_reports_user_verdict ON company_reports(user_id, ai_verdict_stars DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_reports_user_created ON company_reports(user_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_reports_user_revenue ON company_reports(user_id, revenue_potential DESC)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS proposals (

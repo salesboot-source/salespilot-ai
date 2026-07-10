@@ -116,10 +116,10 @@ export default function CompanyProfilePage() {
     return (
       <AppLayout>
         <div className="max-w-2xl mx-auto space-y-6">
-          <div className="h-8 w-48 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="h-8 w-48 bg-[var(--bg-surface)] rounded-lg animate-pulse" />
           <div className="space-y-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+              <div key={i} className="h-12 bg-[var(--bg-surface)] rounded-xl animate-pulse" />
             ))}
           </div>
         </div>
@@ -131,16 +131,16 @@ export default function CompanyProfilePage() {
     <AppLayout>
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Your Company Profile</h1>
-          <p className="mt-1 text-gray-500">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Your Company Profile</h1>
+          <p className="mt-1 text-[var(--text-tertiary)] text-[13px]">
             The more we know about your business, the better AI can personalize proposals and emails for your prospects.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Business Details</h2>
+          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Business Details</h2>
 
             <Input
               label="Company Name"
@@ -172,13 +172,13 @@ export default function CompanyProfilePage() {
           </div>
 
           {/* Products & Services */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Products & Services</h2>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Products & Services</h2>
               <button
                 type="button"
                 onClick={addProduct}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-indigo-400 hover:text-indigo-300 font-medium"
               >
                 + Add another
               </button>
@@ -189,12 +189,12 @@ export default function CompanyProfilePage() {
             )}
 
             {products.map((product, index) => (
-              <div key={index} className="space-y-3 p-4 bg-gray-50 rounded-xl relative">
+              <div key={index} className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-xl relative">
                 {products.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeProduct(index)}
-                    className="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-lg"
+                    className="absolute top-3 right-3 text-[var(--text-tertiary)] hover:text-red-400 text-lg"
                   >
                     ×
                   </button>
@@ -219,8 +219,8 @@ export default function CompanyProfilePage() {
           </div>
 
           {/* Additional Info */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Additional Context</h2>
+          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Additional Context</h2>
 
             <Textarea
               label="Target Market"

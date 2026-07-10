@@ -2,132 +2,352 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { api, ApiError } from '@/lib/api';
+import type { IntelligenceReportV4, CompanyReportRow, EnrichedScore, ServiceRecommendation } from '@/lib/intelligence/types';
 
-interface PainPoint { pain: string; reasoning: string; }
-interface Opportunity { service: string; fit_reason: string; }
-interface Objection { objection: string; response: string; }
+// ============================================================
+// UTILITIES
+// ============================================================
 
-interface IntelligenceReport {
-  executive_summary: string;
-  company_overview: {
-    industry: string;
-    business_model: string;
-    products_services: string;
-    target_market: string;
-    estimated_size: string;
-    growth_stage: string;
-  };
-  technology_stack: {
-    website_platform: string;
-    analytics: string;
-    marketing_tools: string;
-    crm: string;
-    other_tools: string;
-  };
-  digital_presence: {
-    website_quality: string;
-    seo_assessment: string;
-    social_media: {
-      linkedin: string;
-      instagram: string;
-      facebook: string;
-      other: string;
-    };
-    content_activity: string;
-  };
-  business_signals: {
-    hiring: string;
-    funding: string;
-    expansion: string;
-    partnerships: string;
-    news: string;
-  };
-  scores: {
-    opportunity_score: number;
-    opportunity_reasoning: string;
-    buying_intent: string;
-    buying_intent_reasoning: string;
-    digital_maturity: number;
-    digital_maturity_reasoning: string;
-  };
-  pain_points: PainPoint[];
-  opportunities: Opportunity[];
-  sales_strategy: {
-    suggested_angle: string;
-    value_proposition: string;
-    first_message: string;
-    best_department: string;
-    objections: Objection[];
-    followup_sequence: string[];
-  };
-  confidence: {
-    level: string;
-    limitations: string;
-  };
+function scoreColor(v: number) {
+  if (v >= 75) return 'text-emerald-400';
+  if (v >= 50) return 'text-amber-400';
+  return 'text-red-400';
 }
 
-interface Report {
-  id: string;
-  company_name: string;
-  website: string | null;
-  industry: string | null;
-  output: IntelligenceReport;
-  opportunity_score: number;
-  buying_intent: string;
-  digital_maturity: number;
-  version: number;
-  created_at: string;
+function scoreBorder(v: number) {
+  if (v >= 75) return 'border-emerald-500/20';
+  if (v >= 50) return 'border-amber-500/20';
+  return 'border-red-500/20';
 }
 
-interface Proposal { id: string; content: string; created_at: string; }
-interface Email { id: string; subject: string; body: string; tone: string; created_at: string; }
-interface WhatsApp { id: string; message: string; created_at: string; }
+function scoreBg(v: number) {
+  if (v >= 75) return 'bg-emerald-500/5';
+  if (v >= 50) return 'bg-amber-500/5';
+  return 'bg-red-500/5';
+}
 
-// Score Badge Component
-function ScoreBadge({ score, label, size = 'md' }: { score: number; label: string; size?: 'sm' | 'md' | 'lg' }) {
-  const color = score >= 75 ? 'text-green-600 bg-green-50 border-green-200' 
-    : score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' 
-    : 'text-red-600 bg-red-50 border-red-200';
-  const sizeClass = size === 'lg' ? 'text-3xl font-bold' : size === 'md' ? 'text-xl font-bold' : 'text-lg font-semibold';
-  
+function fmt(v: number): string {
+  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+  return `$${v}`;
+}
+
+function Stars({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' | 'lg' }) {
+  const s = size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-xs' : 'text-sm';
   return (
-    <div className={`rounded-xl border p-4 text-center ${color}`}>
-      <div className={sizeClass}>{score}</div>
-      <div className="text-xs font-medium mt-1 opacity-75">{label}</div>
-    </div>
+    <span className={`inline-flex gap-0.5 ${s}`} aria-label={`${count} of 5 stars`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < count ? 'text-amber-400' : 'text-white/10'}>★</span>
+      ))}
+    </span>
   );
 }
 
-// Intent Badge
-function IntentBadge({ intent }: { intent: string }) {
-  const color = intent === 'High' ? 'bg-green-100 text-green-700' 
-    : intent === 'Medium' ? 'bg-amber-100 text-amber-700' 
-    : 'bg-red-100 text-red-700';
-  return <span className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}>{intent}</span>;
+function clip(text: string, toast: (t: 'success' | 'error', m: string) => void, label: string) {
+  navigator.clipboard.writeText(text);
+  toast('success', `${label} copied`);
 }
 
-// Collapsible Section
-function Section({ title, icon, children, defaultOpen = true }: { title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+// ============================================================
+// SCORE CARD
+// ============================================================
+
+function ScoreCard({ score, label, icon }: { score: EnrichedScore; label: string; icon: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
+    <motion.div
+      layout
+      className={`rounded-2xl border ${scoreBorder(score.value)} ${scoreBg(score.value)} p-5 transition-all hover:border-opacity-40`}
+    >
+      <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{icon}</span>
-          <span className="font-semibold text-gray-900">{title}</span>
+          {icon}
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">{label}</span>
         </div>
-        <span className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+        <div className="text-[11px] text-[var(--text-tertiary)]">{score.confidence}% conf.</div>
+      </div>
+      <div className={`text-3xl font-bold mt-3 ${scoreColor(score.value)}`}>{score.value}</div>
+      <p className="text-[12px] text-[var(--text-secondary)] mt-2 leading-relaxed">{score.reason}</p>
+      <button onClick={() => setExpanded(!expanded)} className="text-[11px] text-[var(--text-tertiary)] hover:text-indigo-400 mt-2 transition-colors">
+        {expanded ? '− Hide evidence' : '+ Evidence'}
       </button>
-      {open && <div className="px-5 pb-5 border-t border-gray-100 pt-4">{children}</div>}
-    </div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.ul
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-2 space-y-1 overflow-hidden"
+          >
+            {score.evidence.map((e, i) => (
+              <li key={i} className="text-[11px] text-[var(--text-tertiary)] pl-3 border-l border-white/10">{e}</li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
+
+// ============================================================
+// SERVICE CARD
+// ============================================================
+
+function ServiceCard({ rec, index }: { rec: ServiceRecommendation; index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="flex items-center gap-4 p-4 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-indigo-500/20 transition-all group"
+    >
+      <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+        <span className="text-[11px] font-bold text-indigo-400">#{index + 1}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-medium text-[var(--text-primary)]">{rec.service}</span>
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+            rec.probability >= 75 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+            : rec.probability >= 50 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+            : 'bg-red-500/10 text-red-400 border-red-500/20'
+          }`}>{rec.probability}%</span>
+        </div>
+        <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">{rec.reason}</p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{fmt(rec.estimated_value_min)}–{fmt(rec.estimated_value_max)}</div>
+        <div className="text-[10px] text-[var(--text-tertiary)]">Est. Value</div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// AI DECISION HERO CARD
+// ============================================================
+
+function DecisionHero({ report }: { report: IntelligenceReportV4 }) {
+  const v = report.ai_verdict;
+  const s = report.scores;
+  const top = report.service_recommendations[0];
+
+  const glowColor = v.stars >= 4 ? 'shadow-emerald-500/10' : v.stars >= 3 ? 'shadow-amber-500/10' : 'shadow-red-500/10';
+  const accentColor = v.stars >= 4 ? 'from-emerald-500 to-teal-500' : v.stars >= 3 ? 'from-amber-500 to-orange-500' : 'from-red-500 to-pink-500';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className={`rounded-3xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-8 shadow-2xl ${glowColor}`}
+    >
+      {/* Badge + Stars */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2.5">
+          <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${accentColor}`} />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">AI Decision</span>
+        </div>
+        <Stars count={v.stars} size="lg" />
+      </div>
+
+      {/* Action Label */}
+      <h2 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{v.action_label}</h2>
+      <p className="text-[14px] text-[var(--text-secondary)] mt-3 leading-relaxed max-w-2xl">{v.explanation}</p>
+
+      {/* Metrics strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
+        <div className="rounded-xl bg-[var(--bg-tertiary)] p-4 text-center border border-[var(--border-subtle)]">
+          <div className={`text-2xl font-bold ${scoreColor(s.revenue_potential.value)}`}>{s.revenue_potential.value}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mt-1">Revenue</div>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-tertiary)] p-4 text-center border border-[var(--border-subtle)]">
+          <div className="text-2xl font-bold text-[var(--text-primary)]">{fmt(s.deal_size.max)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mt-1">Deal Size</div>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-tertiary)] p-4 text-center border border-[var(--border-subtle)]">
+          <div className={`text-2xl font-bold ${scoreColor(s.urgency.value)}`}>{s.urgency.value}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mt-1">Urgency</div>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-tertiary)] p-4 text-center border border-[var(--border-subtle)]">
+          <div className="text-sm font-semibold text-[var(--text-primary)] leading-tight">{top?.service || '—'}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mt-1">Top Service</div>
+        </div>
+      </div>
+
+      {/* Key factor */}
+      <div className="mt-6 p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+        <div className="text-[10px] uppercase tracking-[0.15em] text-indigo-400 font-medium mb-1">Key Factor</div>
+        <p className="text-[13px] text-[var(--text-secondary)]">{v.top_reason}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// COLLAPSIBLE SECTION
+// ============================================================
+
+function Section({ id, title, children, onCopy }: {
+  id: string; title: string; children: React.ReactNode; onCopy?: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section id={id} className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-white/[0.01] transition-colors"
+      >
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</span>
+        <div className="flex items-center gap-2">
+          {onCopy && (
+            <span
+              onClick={(e) => { e.stopPropagation(); onCopy(); }}
+              className="text-[11px] text-[var(--text-tertiary)] hover:text-indigo-400 px-2 py-1 rounded-lg hover:bg-indigo-500/10 cursor-pointer transition-colors"
+            >
+              Copy
+            </span>
+          )}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`text-[var(--text-tertiary)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+// ============================================================
+// SIDEBAR NAV
+// ============================================================
+
+const NAV = [
+  { id: 'decision', label: 'AI Decision' },
+  { id: 'scores', label: 'Revenue Scores' },
+  { id: 'services', label: 'Services' },
+  { id: 'overview', label: 'Company' },
+  { id: 'pain', label: 'Pain Points' },
+  { id: 'strategy', label: 'Strategy' },
+  { id: 'signals', label: 'Signals' },
+];
+
+function ReportNav({ active }: { active: string }) {
+  return (
+    <nav className="hidden lg:block sticky top-8 space-y-0.5 w-44 flex-shrink-0">
+      {NAV.map(n => (
+        <button
+          key={n.id}
+          onClick={() => document.getElementById(n.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className={`w-full text-left px-3 py-1.5 rounded-lg text-[12px] transition-all ${
+            active === n.id
+              ? 'text-indigo-400 bg-indigo-500/10 font-medium'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/[0.02]'
+          }`}
+        >
+          {n.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+// ============================================================
+// LOADING STATE
+// ============================================================
+
+const STAGES = [
+  'Analyzing company profile',
+  'Evaluating market position',
+  'Calculating revenue potential',
+  'Assessing decision makers',
+  'Scoring competitive landscape',
+  'Identifying service opportunities',
+  'Computing AI verdict',
+  'Finalizing report',
+];
+
+function LoadingState({ stage }: { stage: number }) {
+  const pct = Math.min(((stage + 1) / STAGES.length) * 100, 95);
+  const label = STAGES[Math.min(stage, STAGES.length - 1)];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.03] p-6 space-y-4"
+    >
+      <div className="flex items-center gap-3">
+        <div className="h-4 w-4 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />
+        <span className="text-[13px] font-medium text-indigo-300">{label}...</span>
+      </div>
+      <div className="h-1 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        />
+      </div>
+      <p className="text-[11px] text-[var(--text-tertiary)]">Typically 20–40 seconds</p>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+function exportMd(name: string, r: IntelligenceReportV4, date: string): string {
+  const s = r.scores;
+  return `# AI Decision Report: ${name}
+Generated: ${new Date(date).toLocaleDateString()}
+
+## AI VERDICT: ${r.ai_verdict.action_label} ${'★'.repeat(r.ai_verdict.stars)}
+${r.ai_verdict.explanation}
+Key Factor: ${r.ai_verdict.top_reason}
+
+## Revenue Scores
+- Revenue Potential: ${s.revenue_potential.value}/100
+- Deal Size: ${fmt(s.deal_size.min)}–${fmt(s.deal_size.max)}
+- Urgency: ${s.urgency.value}/100
+- Decision Maker: ${s.decision_maker_confidence.value}/100
+- Competition Risk: ${s.competition_risk.value}/100
+
+## Services
+${r.service_recommendations.map((x, i) => `${i+1}. ${x.service} (${x.probability}%) — ${fmt(x.estimated_value_min)}–${fmt(x.estimated_value_max)}`).join('\n')}
+
+## Pain Points
+${r.pain_points.map(p => `- [${p.severity}] ${p.pain}`).join('\n')}
+
+## Strategy
+- Angle: ${r.sales_strategy.suggested_angle}
+- Value Prop: ${r.sales_strategy.value_proposition}
+- Target: ${r.sales_strategy.best_department}
+- Message: ${r.sales_strategy.first_message}
+`;
+}
+
+// ============================================================
+// MAIN CONTENT
+// ============================================================
 
 function ResearchContent() {
   const searchParams = useSearchParams();
@@ -139,537 +359,339 @@ function ResearchContent() {
   const companyId = searchParams.get('company_id') || '';
 
   const [researching, setResearching] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [report, setReport] = useState<Report | null>(null);
-
-  const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [generatingProposal, setGeneratingProposal] = useState(false);
-  const [email, setEmail] = useState<Email | null>(null);
-  const [generatingEmail, setGeneratingEmail] = useState(false);
-  const [emailTone, setEmailTone] = useState('formal');
-  const [whatsapp, setWhatsApp] = useState<WhatsApp | null>(null);
-  const [generatingWhatsApp, setGeneratingWhatsApp] = useState(false);
-
-  const [history, setHistory] = useState<Report[]>([]);
+  const [stage, setStage] = useState(0);
+  const [report, setReport] = useState<CompanyReportRow | null>(null);
+  const [history, setHistory] = useState<CompanyReportRow[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState('decision');
 
   const { toast } = useToast();
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => {
+    api.get<CompanyReportRow[]>('/research').then(r => setHistory(r.data || [])).catch(() => {});
+  }, []);
 
-  const loadHistory = async () => {
-    try {
-      const res = await api.get<Report[]>('/research');
-      setHistory(res.data || []);
-    } catch { /* ignore */ }
-  };
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!report) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = NAV.findIndex(n => n.id === activeSection);
+      if (e.key === 'j' && idx < NAV.length - 1) {
+        const next = NAV[idx + 1].id;
+        setActiveSection(next);
+        document.getElementById(next)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (e.key === 'k' && idx > 0) {
+        const prev = NAV[idx - 1].id;
+        setActiveSection(prev);
+        document.getElementById(prev)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (e.key === 'e' && report) {
+        const o = report.output as IntelligenceReportV4;
+        if (o?.ai_verdict) {
+          navigator.clipboard.writeText(exportMd(report.company_name, o, report.created_at));
+          toast('success', 'Report exported');
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [report, activeSection, toast]);
 
-  const statusMessages = [
-    'Analyzing company profile...',
-    'Detecting technology stack...',
-    'Evaluating digital presence...',
-    'Identifying business signals...',
-    'Calculating opportunity score...',
-    'Detecting pain points...',
-    'Mapping service opportunities...',
-    'Building sales strategy...',
-    'Preparing intelligence report...',
-  ];
+  // Intersection observer
+  useEffect(() => {
+    if (!report) return;
+    const obs = new IntersectionObserver(
+      entries => { for (const e of entries) if (e.isIntersecting) setActiveSection(e.target.id); },
+      { rootMargin: '-20% 0px -60% 0px' }
+    );
+    NAV.forEach(n => { const el = document.getElementById(n.id); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, [report]);
 
   const handleResearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setResearching(true);
     setReport(null);
-    setProposal(null);
-    setEmail(null);
-    setWhatsApp(null);
-
-    let msgIndex = 0;
-    setStatusMessage(statusMessages[0]);
-    const interval = setInterval(() => {
-      msgIndex = (msgIndex + 1) % statusMessages.length;
-      setStatusMessage(statusMessages[msgIndex]);
-    }, 3000);
-
+    setStage(0);
+    let s = 0;
+    const iv = setInterval(() => { s++; setStage(s); }, 4500);
     try {
-      const res = await api.post<Report>('/research', {
-        company_name: companyName,
-        website: website || undefined,
-        industry: industry || undefined,
-        country: country || undefined,
-        notes: notes || undefined,
-        target_company_id: companyId || undefined,
+      const res = await api.post<CompanyReportRow>('/research', {
+        company_name: companyName, website: website || undefined, industry: industry || undefined,
+        country: country || undefined, notes: notes || undefined, target_company_id: companyId || undefined,
       });
       setReport(res.data);
-      toast('success', 'Intelligence report complete! ✓');
-      loadHistory();
+      toast('success', 'Report ready');
+      api.get<CompanyReportRow[]>('/research').then(r => setHistory(r.data || [])).catch(() => {});
     } catch (err) {
-      const error = err as ApiError;
-      toast('error', error.message || "We couldn't complete the research. Try again.");
-    } finally {
-      clearInterval(interval);
-      setResearching(false);
-      setStatusMessage('');
-    }
+      toast('error', (err as ApiError).message || 'Research failed');
+    } finally { clearInterval(iv); setResearching(false); }
   };
 
-  const handleGenerateProposal = async () => {
-    if (!report) return;
-    setGeneratingProposal(true);
-    try {
-      const res = await api.post<Proposal>('/proposal', { research_id: report.id });
-      setProposal(res.data);
-      toast('success', 'Proposal ready! ✓');
-    } catch (err) {
-      const error = err as ApiError;
-      toast('error', error.message || "Couldn't generate proposal.");
-    } finally { setGeneratingProposal(false); }
-  };
-
-  const handleGenerateEmail = async () => {
-    if (!report) return;
-    setGeneratingEmail(true);
-    try {
-      const res = await api.post<Email>('/email', { research_id: report.id });
-      setEmail(res.data);
-      toast('success', 'Email ready! ✓');
-    } catch (err) {
-      const error = err as ApiError;
-      toast('error', error.message || "Couldn't generate email.");
-    } finally { setGeneratingEmail(false); }
-  };
-
-  const handleGenerateWhatsApp = async () => {
-    if (!report) return;
-    setGeneratingWhatsApp(true);
-    try {
-      const res = await api.post<WhatsApp>('/whatsapp', { research_id: report.id });
-      setWhatsApp(res.data);
-      toast('success', 'Message ready! ✓');
-    } catch (err) {
-      const error = err as ApiError;
-      toast('error', error.message || "Couldn't generate message.");
-    } finally { setGeneratingWhatsApp(false); }
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast('success', `${label} copied! ✓`);
-  };
-
-  const exportMarkdown = () => {
-    if (!report) return;
-    const r = report.output;
-    const md = `# Intelligence Report: ${report.company_name}
-Generated: ${new Date(report.created_at).toLocaleDateString()}
-
-## Executive Summary
-${r.executive_summary}
-
-## Company Overview
-- Industry: ${r.company_overview.industry}
-- Business Model: ${r.company_overview.business_model}
-- Products/Services: ${r.company_overview.products_services}
-- Target Market: ${r.company_overview.target_market}
-- Size: ${r.company_overview.estimated_size}
-- Growth Stage: ${r.company_overview.growth_stage}
-
-## Scores
-- Opportunity Score: ${r.scores.opportunity_score}/100
-- Buying Intent: ${r.scores.buying_intent}
-- Digital Maturity: ${r.scores.digital_maturity}/100
-
-## Pain Points
-${r.pain_points.map(p => `- ${p.pain}: ${p.reasoning}`).join('\n')}
-
-## Opportunities
-${r.opportunities.map(o => `- ${o.service}: ${o.fit_reason}`).join('\n')}
-
-## Sales Strategy
-- Angle: ${r.sales_strategy.suggested_angle}
-- Value Prop: ${r.sales_strategy.value_proposition}
-- Contact: ${r.sales_strategy.best_department}
-- First Message: ${r.sales_strategy.first_message}
-`;
-    navigator.clipboard.writeText(md);
-    toast('success', 'Report copied as Markdown! ✓');
-  };
-
-  const loadFromHistory = (item: Report) => {
-    setReport(item);
-    setCompanyName(item.company_name);
-    setWebsite(item.website || '');
-    setIndustry(item.industry || '');
-    setProposal(null);
-    setEmail(null);
-    setWhatsApp(null);
-    setShowHistory(false);
-  };
-
-  // Navigation items for report sections
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'tech', label: 'Tech Stack', icon: '💻' },
-    { id: 'digital', label: 'Digital', icon: '🌐' },
-    { id: 'signals', label: 'Signals', icon: '📡' },
-    { id: 'pain', label: 'Pain Points', icon: '🎯' },
-    { id: 'opportunities', label: 'Opportunities', icon: '💡' },
-    { id: 'strategy', label: 'Strategy', icon: '🗺️' },
-    { id: 'materials', label: 'Materials', icon: '📄' },
-  ];
+  const output = report?.output as IntelligenceReportV4 | undefined;
+  const isV4 = output && 'ai_verdict' in output && output.ai_verdict;
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Company Intelligence</h1>
-            <p className="text-gray-500 mt-1">Complete business intelligence for B2B sales</p>
+            <h1 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">AI Decision Engine</h1>
+            <p className="text-[12px] text-[var(--text-tertiary)] mt-0.5">Revenue intelligence analysis</p>
           </div>
-          <div className="flex gap-2">
-            {history.length > 0 && (
-              <Button variant="secondary" onClick={() => setShowHistory(!showHistory)}>
-                {showHistory ? 'Hide' : `History (${history.length})`}
-              </Button>
-            )}
-          </div>
+          {history.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}>
+              {showHistory ? 'Close' : `History · ${history.length}`}
+            </Button>
+          )}
         </div>
 
-        {/* History Panel */}
-        {showHistory && history.length > 0 && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
-            <h3 className="font-medium text-gray-900 mb-2">Previous Reports</h3>
-            {history.map(item => (
-              <button key={item.id} onClick={() => loadFromHistory(item)} 
-                className="w-full text-left p-3 rounded-xl hover:bg-gray-50 transition-colors flex justify-between items-center">
-                <div>
-                  <span className="font-medium text-gray-900">{item.company_name}</span>
-                  {item.opportunity_score > 0 && (
-                    <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${item.opportunity_score >= 75 ? 'bg-green-100 text-green-700' : item.opportunity_score >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                      {item.opportunity_score}%
-                    </span>
-                  )}
+        {/* History */}
+        <AnimatePresence>
+          {showHistory && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] overflow-hidden"
+            >
+              <div className="p-4 max-h-60 overflow-y-auto divide-y divide-[var(--border-subtle)]">
+                {history.map(h => (
+                  <button key={h.id} onClick={() => { setReport(h); setCompanyName(h.company_name); setShowHistory(false); }}
+                    className="w-full flex items-center justify-between py-2.5 px-2 hover:bg-white/[0.02] rounded-lg transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <Stars count={h.ai_verdict_stars || 0} size="sm" />
+                      <span className="text-[13px] font-medium text-[var(--text-primary)]">{h.company_name}</span>
+                    </div>
+                    <span className="text-[11px] text-[var(--text-tertiary)]">{new Date(h.created_at).toLocaleDateString()}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Form */}
+        <form onSubmit={handleResearch} className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 mb-6">
+          <div className="space-y-4">
+            <Input label="Company" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enter any company name" required />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="Website" value={website} onChange={e => setWebsite(e.target.value)} placeholder="www.company.com" />
+              <Input label="Industry" value={industry} onChange={e => setIndustry(e.target.value)} placeholder="Software, SaaS..." />
+              <Input label="Country" value={country} onChange={e => setCountry(e.target.value)} placeholder="United States" />
+            </div>
+            <Textarea label="Context" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Decision maker, deal context, services to pitch..." rows={2} />
+            <Button type="submit" loading={researching} className="w-full" size="lg">
+              {researching ? 'Analyzing...' : 'Generate AI Decision Report'}
+            </Button>
+          </div>
+        </form>
+
+        {/* Loading */}
+        {researching && <LoadingState stage={stage} />}
+
+        {/* Report */}
+        {isV4 && report && (
+          <div className="flex gap-8 mt-8">
+            <ReportNav active={activeSection} />
+
+            <div className="flex-1 space-y-5 min-w-0">
+              {/* DECISION */}
+              <div id="decision"><DecisionHero report={output} /></div>
+
+              {/* SUMMARY */}
+              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6">
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{output.executive_summary}</p>
+                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+                    output.confidence.level === 'High' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : output.confidence.level === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                  }`}>{output.confidence.level} Confidence</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">{output.confidence.limitations}</span>
                 </div>
-                <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
-              </button>
-            ))}
+              </div>
+
+              {/* SCORES */}
+              <Section id="scores" title="Revenue Intelligence" onCopy={() => clip(
+                `Revenue: ${output.scores.revenue_potential.value} | Deal: ${fmt(output.scores.deal_size.min)}–${fmt(output.scores.deal_size.max)} | Urgency: ${output.scores.urgency.value}`,
+                toast, 'Scores'
+              )}>
+                {/* Deal Size */}
+                <div className="mb-5 p-5 rounded-xl bg-gradient-to-r from-indigo-500/[0.05] to-purple-500/[0.05] border border-indigo-500/10">
+                  <div className="text-[10px] uppercase tracking-[0.15em] text-indigo-400 font-medium mb-1">Estimated Deal Size</div>
+                  <div className="text-3xl font-bold text-[var(--text-primary)]">{fmt(output.scores.deal_size.min)} – {fmt(output.scores.deal_size.max)}</div>
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-2">{output.scores.deal_size.reason}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {output.scores.deal_size.evidence.map((e, i) => (
+                      <span key={i} className="text-[10px] bg-[var(--bg-tertiary)] px-2 py-1 rounded-md border border-[var(--border-subtle)] text-[var(--text-tertiary)]">{e}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ScoreCard score={output.scores.revenue_potential} label="Revenue Potential" icon={<DollarIcon />} />
+                  <ScoreCard score={output.scores.urgency} label="Urgency" icon={<ClockIcon />} />
+                  <ScoreCard score={output.scores.decision_maker_confidence} label="Decision Maker" icon={<UserIcon />} />
+                  <ScoreCard score={output.scores.competition_risk} label="Competition Risk" icon={<ShieldIcon />} />
+                </div>
+                {/* Legacy scores */}
+                <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                  <div className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-tertiary)] font-medium mb-3">Additional Metrics</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <MiniScore value={output.scores.opportunity_score.value} label="Opportunity" />
+                    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-tertiary)] p-3 text-center">
+                      <div className={`text-sm font-bold ${output.scores.buying_intent.level === 'High' ? 'text-emerald-400' : output.scores.buying_intent.level === 'Medium' ? 'text-amber-400' : 'text-red-400'}`}>
+                        {output.scores.buying_intent.level}
+                      </div>
+                      <div className="text-[9px] uppercase text-[var(--text-tertiary)] mt-1">Intent</div>
+                    </div>
+                    <MiniScore value={output.scores.digital_maturity.value} label="Digital" />
+                  </div>
+                </div>
+              </Section>
+
+              {/* SERVICES */}
+              <Section id="services" title="Recommended Services" onCopy={() => clip(
+                output.service_recommendations.map((r, i) => `${i+1}. ${r.service} (${r.probability}%) — ${fmt(r.estimated_value_min)}–${fmt(r.estimated_value_max)}`).join('\n'),
+                toast, 'Services'
+              )}>
+                <div className="space-y-2">
+                  {output.service_recommendations.map((rec, i) => <ServiceCard key={i} rec={rec} index={i} />)}
+                </div>
+                <div className="mt-4 p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                  <div className="text-[10px] uppercase tracking-[0.15em] text-indigo-400 font-medium mb-1">Total Pipeline</div>
+                  <div className="text-lg font-bold text-[var(--text-primary)]">
+                    {fmt(output.service_recommendations.reduce((s, r) => s + r.estimated_value_min, 0))} – {fmt(output.service_recommendations.reduce((s, r) => s + r.estimated_value_max, 0))}
+                  </div>
+                </div>
+              </Section>
+
+              {/* COMPANY */}
+              <Section id="overview" title="Company Profile">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { l: 'Industry', v: output.company_overview.industry },
+                    { l: 'Model', v: output.company_overview.business_model },
+                    { l: 'Products', v: output.company_overview.products_services },
+                    { l: 'Market', v: output.company_overview.target_market },
+                    { l: 'Size', v: output.company_overview.estimated_size },
+                    { l: 'Growth', v: output.company_overview.growth_stage },
+                  ].map(x => (
+                    <div key={x.l} className="p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)]">{x.l}</div>
+                      <div className="text-[12px] text-[var(--text-primary)] mt-1 font-medium">{x.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {Object.entries(output.technology_stack).map(([k, v]) => (
+                    <div key={k} className="p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                      <div className="text-[9px] uppercase text-[var(--text-tertiary)]">{k.replace(/_/g, ' ')}</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {Object.entries(output.digital_presence.social_media).map(([p, s]) => (
+                    <span key={p} className={`text-[10px] px-2 py-1 rounded-md border ${
+                      s === 'Active' ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/5' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)]'
+                    }`}>{p}: {s}</span>
+                  ))}
+                </div>
+              </Section>
+
+              {/* PAIN POINTS */}
+              <Section id="pain" title="Pain Points" onCopy={() => clip(output.pain_points.map(p => `[${p.severity}] ${p.pain}`).join('\n'), toast, 'Pain points')}>
+                <div className="space-y-2">
+                  {output.pain_points.map((p, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
+                      className={`p-4 rounded-xl border ${p.severity === 'High' ? 'border-red-500/20 bg-red-500/[0.03]' : p.severity === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-[var(--border-default)] bg-[var(--bg-tertiary)]'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${p.severity === 'High' ? 'bg-red-500/15 text-red-400' : p.severity === 'Medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-[var(--text-tertiary)]'}`}>{p.severity}</span>
+                        <span className="text-[12px] font-medium text-[var(--text-primary)]">{p.pain}</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-tertiary)] mt-1">{p.reasoning}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </Section>
+
+              {/* STRATEGY */}
+              <Section id="strategy" title="Sales Strategy" onCopy={() => clip(
+                `Angle: ${output.sales_strategy.suggested_angle}\nValue Prop: ${output.sales_strategy.value_proposition}\nFirst Message: ${output.sales_strategy.first_message}`,
+                toast, 'Strategy'
+              )}>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-500/[0.04] to-purple-500/[0.04] border border-indigo-500/10">
+                    <div className="text-[9px] uppercase tracking-[0.15em] text-indigo-400 font-medium">Sales Angle</div>
+                    <p className="text-[13px] text-[var(--text-primary)] mt-1 font-medium">{output.sales_strategy.suggested_angle}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                    <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-tertiary)]">Value Proposition</div>
+                    <p className="text-[12px] text-[var(--text-secondary)] mt-1">{output.sales_strategy.value_proposition}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                      <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-tertiary)]">Target</div>
+                      <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-1">{output.sales_strategy.best_department}</div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[9px] uppercase tracking-[0.15em] text-indigo-400">First Message</div>
+                        <button onClick={() => clip(output.sales_strategy.first_message, toast, 'Message')} className="text-[10px] text-indigo-400/60 hover:text-indigo-400 transition-colors">Copy</button>
+                      </div>
+                      <p className="text-[12px] text-[var(--text-secondary)] mt-1 leading-relaxed">{output.sales_strategy.first_message}</p>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+
+              {/* SIGNALS */}
+              <Section id="signals" title="Business Signals">
+                <div className="space-y-2">
+                  {[
+                    { l: 'Hiring', v: output.business_signals.hiring },
+                    { l: 'Funding', v: output.business_signals.funding },
+                    { l: 'Expansion', v: output.business_signals.expansion },
+                    { l: 'Partnerships', v: output.business_signals.partnerships },
+                    { l: 'News', v: output.business_signals.news },
+                  ].map(x => (
+                    <div key={x.l} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] w-20 flex-shrink-0 pt-0.5">{x.l}</div>
+                      <div className="text-[12px] text-[var(--text-secondary)]">{x.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              {/* Footer */}
+              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                    v{report.version} · {new Date(report.created_at).toLocaleString()} · {report.ai_model} · Prompt v{report.prompt_version}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(exportMd(report.company_name, output, report.created_at)); toast('success', 'Copied'); }}>Copy</Button>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      const blob = new Blob([exportMd(report.company_name, output, report.created_at)], { type: 'text/markdown' });
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                      a.download = `${report.company_name.replace(/\s+/g, '-').toLowerCase()}-report.md`; a.click();
+                    }}>Download</Button>
+                    <Button variant="ghost" size="sm" onClick={handleResearch}>Regenerate</Button>
+                  </div>
+                </div>
+                <div className="text-[10px] text-[var(--text-tertiary)] mt-2">Keyboard: j/k navigate · e export</div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Research Form */}
-        <form onSubmit={handleResearch} className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Research a Company</h2>
-          <Input label="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enter any company name" required />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input label="Website (optional)" value={website} onChange={e => setWebsite(e.target.value)} placeholder="www.company.com" />
-            <Input label="Industry (optional)" value={industry} onChange={e => setIndustry(e.target.value)} placeholder="Software, Farmasi..." />
-            <Input label="Country (optional)" value={country} onChange={e => setCountry(e.target.value)} placeholder="Indonesia" />
-          </div>
-          <Textarea label="Additional notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Klien untuk jasa perbaikan website, target marketing manager..." rows={2} />
-          <Button type="submit" loading={researching} className="w-full">
-            {researching ? statusMessage : '🔍 Research Company'}
-          </Button>
-          {researching && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-              <span className="text-sm text-blue-700 font-medium">{statusMessage}</span>
-            </div>
-          )}
-        </form>
-
-        {/* Intelligence Report */}
-        {report && report.output && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Report Header with Scores */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{report.company_name}</h2>
-                  <p className="text-sm text-gray-500 mt-1">{report.output.executive_summary}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={exportMarkdown} className="text-sm text-gray-500 hover:text-blue-600 px-3 py-1 rounded-lg hover:bg-blue-50">📋 Export</button>
-                  <button onClick={handleResearch} className="text-sm text-gray-500 hover:text-blue-600 px-3 py-1 rounded-lg hover:bg-blue-50">🔄 Regenerate</button>
-                </div>
-              </div>
-
-              {/* Score Cards */}
-              <div className="grid grid-cols-3 gap-3 mt-4">
-                <ScoreBadge score={report.output.scores.opportunity_score} label="Opportunity" size="lg" />
-                <div className="rounded-xl border p-4 text-center bg-gray-50 border-gray-200">
-                  <IntentBadge intent={report.output.scores.buying_intent} />
-                  <div className="text-xs font-medium mt-2 text-gray-500">Buying Intent</div>
-                </div>
-                <ScoreBadge score={report.output.scores.digital_maturity} label="Digital Maturity" size="lg" />
-              </div>
-
-              {/* Confidence */}
-              <div className="mt-4 p-3 rounded-lg bg-gray-50 flex items-center gap-2">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${report.output.confidence.level === 'High' ? 'bg-green-100 text-green-700' : report.output.confidence.level === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                  {report.output.confidence.level} Confidence
-                </span>
-                <span className="text-xs text-gray-500">{report.output.confidence.limitations}</span>
-              </div>
-            </div>
-
-            {/* Section Navigation */}
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              {navItems.map(item => (
-                <button key={item.id} onClick={() => setActiveSection(item.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeSection === item.id ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'
-                  }`}>
-                  <span>{item.icon}</span> {item.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Company Overview Section */}
-            {activeSection === 'overview' && (
-              <Section title="Company Overview" icon="📊" defaultOpen={true}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Industry', value: report.output.company_overview.industry },
-                    { label: 'Business Model', value: report.output.company_overview.business_model },
-                    { label: 'Products & Services', value: report.output.company_overview.products_services },
-                    { label: 'Target Market', value: report.output.company_overview.target_market },
-                    { label: 'Estimated Size', value: report.output.company_overview.estimated_size },
-                    { label: 'Growth Stage', value: report.output.company_overview.growth_stage },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">{item.label}</div>
-                      <div className="text-sm text-gray-900 mt-1">{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Technology Stack */}
-            {activeSection === 'tech' && (
-              <Section title="Technology Stack" icon="💻" defaultOpen={true}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Website Platform', value: report.output.technology_stack.website_platform },
-                    { label: 'Analytics', value: report.output.technology_stack.analytics },
-                    { label: 'Marketing Tools', value: report.output.technology_stack.marketing_tools },
-                    { label: 'CRM', value: report.output.technology_stack.crm },
-                    { label: 'Other Tools', value: report.output.technology_stack.other_tools },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">{item.label}</div>
-                      <div className="text-sm text-gray-900 mt-1">{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Digital Presence */}
-            {activeSection === 'digital' && (
-              <Section title="Digital Presence" icon="🌐" defaultOpen={true}>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-3 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase">Website Quality</div>
-                      <div className="text-sm text-gray-900 mt-1">{report.output.digital_presence.website_quality}</div>
-                    </div>
-                    <div className="p-3 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase">SEO Assessment</div>
-                      <div className="text-sm text-gray-900 mt-1">{report.output.digital_presence.seo_assessment}</div>
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50">
-                    <div className="text-xs font-medium text-gray-400 uppercase mb-2">Social Media</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {Object.entries(report.output.digital_presence.social_media).map(([platform, status]) => (
-                        <div key={platform} className="text-center p-2 rounded-lg bg-white border border-gray-100">
-                          <div className="text-xs capitalize text-gray-500">{platform}</div>
-                          <div className={`text-xs font-medium mt-0.5 ${status === 'Active' ? 'text-green-600' : 'text-gray-400'}`}>{status}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50">
-                    <div className="text-xs font-medium text-gray-400 uppercase">Content Activity</div>
-                    <div className="text-sm text-gray-900 mt-1">{report.output.digital_presence.content_activity}</div>
-                  </div>
-                </div>
-              </Section>
-            )}
-
-            {/* Business Signals */}
-            {activeSection === 'signals' && (
-              <Section title="Business Signals" icon="📡" defaultOpen={true}>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Hiring', value: report.output.business_signals.hiring, icon: '👥' },
-                    { label: 'Funding', value: report.output.business_signals.funding, icon: '💰' },
-                    { label: 'Expansion', value: report.output.business_signals.expansion, icon: '📈' },
-                    { label: 'Partnerships', value: report.output.business_signals.partnerships, icon: '🤝' },
-                    { label: 'News', value: report.output.business_signals.news, icon: '📰' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
-                      <span className="text-lg">{item.icon}</span>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{item.label}</div>
-                        <div className="text-sm text-gray-600 mt-0.5">{item.value}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Pain Points */}
-            {activeSection === 'pain' && (
-              <Section title="Pain Points" icon="🎯" defaultOpen={true}>
-                <div className="space-y-3">
-                  {report.output.pain_points.map((point, i) => (
-                    <div key={i} className="p-4 rounded-lg bg-red-50 border border-red-100">
-                      <div className="font-medium text-gray-900 text-sm">{point.pain}</div>
-                      <div className="text-sm text-gray-600 mt-1">{point.reasoning}</div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Opportunities */}
-            {activeSection === 'opportunities' && (
-              <Section title="Service Opportunities" icon="💡" defaultOpen={true}>
-                <div className="space-y-3">
-                  {report.output.opportunities.map((opp, i) => (
-                    <div key={i} className="p-4 rounded-lg bg-green-50 border border-green-100">
-                      <div className="font-medium text-gray-900 text-sm">{opp.service}</div>
-                      <div className="text-sm text-gray-600 mt-1">{opp.fit_reason}</div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Sales Strategy */}
-            {activeSection === 'strategy' && (
-              <Section title="Sales Strategy" icon="🗺️" defaultOpen={true}>
-                <div className="space-y-4">
-                  {/* Approach */}
-                  <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-                    <div className="text-xs font-medium text-blue-600 uppercase">Sales Angle</div>
-                    <div className="text-sm text-gray-900 mt-1">{report.output.sales_strategy.suggested_angle}</div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-                    <div className="text-xs font-medium text-blue-600 uppercase">Value Proposition</div>
-                    <div className="text-sm text-gray-900 mt-1">{report.output.sales_strategy.value_proposition}</div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase">Best Department</div>
-                      <div className="text-sm text-gray-900 mt-1 font-medium">{report.output.sales_strategy.best_department}</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-gray-50">
-                      <div className="text-xs font-medium text-gray-400 uppercase">First Message</div>
-                      <div className="text-sm text-gray-900 mt-1">{report.output.sales_strategy.first_message}</div>
-                      <button onClick={() => copyToClipboard(report.output.sales_strategy.first_message, 'First message')} className="text-xs text-blue-600 mt-2 hover:underline">Copy message</button>
-                    </div>
-                  </div>
-
-                  {/* Objections */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Predicted Objections & Responses</h4>
-                    <div className="space-y-2">
-                      {report.output.sales_strategy.objections.map((obj, i) => (
-                        <div key={i} className="p-3 rounded-lg bg-amber-50 border border-amber-100">
-                          <div className="text-sm font-medium text-gray-900">❓ {obj.objection}</div>
-                          <div className="text-sm text-gray-600 mt-1">💬 {obj.response}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Follow-up Sequence */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Recommended Follow-up Sequence</h4>
-                    <div className="space-y-2">
-                      {report.output.sales_strategy.followup_sequence.map((step, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50">
-                          <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                          <span className="text-sm text-gray-700">{step}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </Section>
-            )}
-
-            {/* Generate Materials Section */}
-            {activeSection === 'materials' && (
-              <div className="space-y-4">
-                <Section title="Generate Sales Materials" icon="📄" defaultOpen={true}>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Button onClick={handleGenerateProposal} loading={generatingProposal} variant="secondary">
-                      {generatingProposal ? 'Writing proposal...' : '📄 Generate Proposal'}
-                    </Button>
-                    <div className="flex gap-2">
-                      <select value={emailTone} onChange={e => setEmailTone(e.target.value)} className="rounded-lg border border-gray-200 px-2 text-sm">
-                        <option value="formal">Formal</option>
-                        <option value="friendly">Friendly</option>
-                        <option value="direct">Direct</option>
-                      </select>
-                      <Button onClick={handleGenerateEmail} loading={generatingEmail} variant="secondary" className="flex-1">
-                        {generatingEmail ? 'Writing...' : '✉️ Email'}
-                      </Button>
-                    </div>
-                    <Button onClick={handleGenerateWhatsApp} loading={generatingWhatsApp} variant="secondary">
-                      {generatingWhatsApp ? 'Writing...' : '💬 WhatsApp'}
-                    </Button>
-                  </div>
-                </Section>
-
-                {/* Proposal */}
-                {proposal && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">📄 Proposal</h3>
-                      <button onClick={() => copyToClipboard(proposal.content, 'Proposal')} className="text-sm text-blue-600 hover:text-blue-700 font-medium px-3 py-1 rounded-lg hover:bg-blue-50">📋 Copy</button>
-                    </div>
-                    <div className="whitespace-pre-wrap text-sm text-gray-600 leading-relaxed">{proposal.content}</div>
-                  </div>
-                )}
-
-                {/* Email */}
-                {email && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">✉️ Outreach Email</h3>
-                      <button onClick={() => copyToClipboard(`Subject: ${email.subject}\n\n${email.body}`, 'Email')} className="text-sm text-blue-600 hover:text-blue-700 font-medium px-3 py-1 rounded-lg hover:bg-blue-50">📋 Copy</button>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400 uppercase">Subject</p>
-                      <p className="font-medium text-gray-900 text-sm">{email.subject}</p>
-                    </div>
-                    <div className="whitespace-pre-wrap text-sm text-gray-600 leading-relaxed">{email.body}</div>
-                  </div>
-                )}
-
-                {/* WhatsApp */}
-                {whatsapp && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">💬 WhatsApp</h3>
-                      <button onClick={() => copyToClipboard(whatsapp.message, 'Message')} className="text-sm text-blue-600 hover:text-blue-700 font-medium px-3 py-1 rounded-lg hover:bg-blue-50">📋 Copy</button>
-                    </div>
-                    <div className="max-w-sm">
-                      <div className="rounded-2xl rounded-bl-sm bg-green-100 p-4 text-sm text-gray-800 leading-relaxed">{whatsapp.message}</div>
-                      <p className="text-xs text-gray-400 mt-1">{whatsapp.message.length}/500 characters</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Legacy fallback */}
+        {report && !isV4 && (
+          <div className="mt-8 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
+            <p className="text-[13px] text-amber-300 mb-3">This report uses an older format. Regenerate for the full AI Decision analysis.</p>
+            <Button variant="secondary" onClick={handleResearch}>Upgrade Report</Button>
           </div>
         )}
       </div>
@@ -677,9 +699,35 @@ ${r.opportunities.map(o => `- ${o.service}: ${o.fit_reason}`).join('\n')}
   );
 }
 
+// ============================================================
+// MINI COMPONENTS
+// ============================================================
+
+function MiniScore({ value, label }: { value: number; label: string }) {
+  return (
+    <div className={`rounded-xl border ${scoreBorder(value)} ${scoreBg(value)} p-3 text-center`}>
+      <div className={`text-lg font-bold ${scoreColor(value)}`}>{value}</div>
+      <div className="text-[9px] uppercase text-[var(--text-tertiary)] mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function DollarIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" strokeLinecap="round"/></svg>; }
+function ClockIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" strokeLinecap="round"/></svg>; }
+function UserIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-400"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round"/><circle cx="12" cy="7" r="4"/></svg>; }
+function ShieldIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round"/></svg>; }
+
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function ResearchPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" /></div>}>
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-[var(--bg-primary)]">
+        <div className="h-4 w-4 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />
+      </div>
+    }>
       <ResearchContent />
     </Suspense>
   );

@@ -54,19 +54,19 @@ export default function RegisterPage() {
         <div className="w-full max-w-sm mx-auto">
           {/* Logo */}
           <Link href="/" className="inline-flex items-center gap-2 mb-10">
-            <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
               S
             </div>
-            <span className="text-lg font-semibold text-gray-900">SalesPilot</span>
+            <span className="text-lg font-semibold text-[var(--text-primary)]">SalesPilot</span>
           </Link>
 
-          <h1 className="text-2xl font-bold text-gray-900">Start closing more deals</h1>
-          <p className="mt-2 text-sm text-gray-500">Create your free account. No credit card needed.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Start closing more deals</h1>
+          <p className="mt-2 text-[13px] text-[var(--text-tertiary)]">Create your free account. No credit card needed.</p>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-[13px] text-red-400">
                 {error}
               </div>
             )}
@@ -116,9 +116,9 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-[13px] text-[var(--text-tertiary)]">
               Already have an account?{' '}
-              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
                 Sign In
               </Link>
             </p>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Panel — Social Proof */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 items-center justify-center p-12">
+      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-indigo-600 to-purple-700 items-center justify-center p-12">
         <div className="max-w-md text-white space-y-8">
           <h2 className="text-3xl font-bold">AI-powered sales in 60 seconds</h2>
           <div className="space-y-4">
@@ -152,7 +152,7 @@ export default function RegisterPage() {
             ))}
           </div>
           <div className="pt-4 border-t border-white/20">
-            <p className="text-sm text-blue-200">
+            <p className="text-sm text-indigo-200">
               Trusted by agencies, software houses, and B2B consultants.
             </p>
           </div>

@@ -12,6 +12,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@netlify/plugin-nextjs": "^5.15.12",
     "bcryptjs": "^3.0.3",
+    "framer-motion": "^12.42.2",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.10",
     "openai": "^6.46.0",
