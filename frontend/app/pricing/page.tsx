@@ -46,16 +46,16 @@ export default function PricingPage() {
         </div>
 
         {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-3 mb-10">
+        <div className="flex items-center justify-center gap-4 mb-10">
           <span className={`text-[13px] ${cycle === 'monthly' ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`}>Monthly</span>
           <button
             onClick={() => setCycle(c => c === 'monthly' ? 'yearly' : 'monthly')}
-            className="relative w-12 h-6 rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] transition-colors"
+            className="relative w-14 h-7 rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] transition-colors min-h-[44px] min-w-[56px] flex items-center"
             aria-label="Toggle billing cycle"
           >
             <motion.div
-              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-indigo-500"
-              animate={{ x: cycle === 'yearly' ? 24 : 0 }}
+              className="absolute top-1 left-1 w-5 h-5 rounded-full bg-indigo-500"
+              animate={{ x: cycle === 'yearly' ? 28 : 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             />
           </button>

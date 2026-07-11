@@ -21,9 +21,9 @@ export function Button({
   const base = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-primary)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 
   const sizes = {
-    sm: 'rounded-lg px-3 py-1.5 text-[12px] gap-1.5',
-    md: 'rounded-xl px-4 py-2.5 text-[13px] gap-2',
-    lg: 'rounded-xl px-6 py-3 text-sm gap-2',
+    sm: 'rounded-lg px-3 py-2 text-[12px] gap-1.5 min-h-[44px]',
+    md: 'rounded-xl px-4 py-2.5 text-[13px] gap-2 min-h-[44px]',
+    lg: 'rounded-xl px-6 py-3 text-sm gap-2 min-h-[48px]',
   };
 
   const variants = {

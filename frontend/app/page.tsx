@@ -48,10 +48,10 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#050816] text-white overflow-x-hidden">
       {/* BACKGROUND */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-600/8 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-500/5 rounded-full blur-[150px]" />
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-600/10 rounded-full blur-[80px] md:blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[250px] md:w-[500px] h-[250px] md:h-[500px] bg-purple-600/8 rounded-full blur-[80px] md:blur-[100px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[800px] h-[400px] md:h-[800px] bg-cyan-500/5 rounded-full blur-[100px] md:blur-[150px]" />
       </div>
 
       {/* NAVBAR */}
@@ -117,7 +117,7 @@ export default function LandingPage() {
                 </div>
               </FadeUp>
               <FadeUp delay={0.1}>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight">
                   Turn Any Company
                   <br />
                   <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
@@ -205,7 +205,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to close deals</h2>
             <p className="mt-3 text-slate-400 text-[15px] max-w-xl mx-auto">AI-powered tools that replace an entire sales team. From discovery to close.</p>
           </FadeUp>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { icon: '🔍', title: 'AI Prospect Discovery', desc: 'Find 200+ ideal companies instantly. AI searches, scores, and ranks them for you.' },
               { icon: '📊', title: 'Revenue Intelligence', desc: 'Every company scored with deal size, urgency, buying intent, and competition risk.' },
@@ -265,7 +265,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Simple, transparent pricing</h2>
             <p className="mt-3 text-slate-400 text-[15px]">Start free. Scale as you grow.</p>
           </FadeUp>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             {[
               { name: 'Free', price: 'Rp 0', desc: 'Get started', features: ['20 Prospect Discovery', 'AI Company Research', 'Basic Scoring', 'Save Prospects'], popular: false },
               { name: 'Professional', price: 'Rp 799K', desc: '/month', features: ['2,000 Prospects', 'AI Best 10 Match', 'Opportunity Scoring', 'Proposal Generator', 'Email & WhatsApp AI', 'CRM', 'Priority Support'], popular: true },

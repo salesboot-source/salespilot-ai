@@ -11,6 +11,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'SalesPilot AI — Revenue Intelligence',
   description: 'AI-powered revenue intelligence platform for B2B sales teams',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
 };
 
 export default function RootLayout({

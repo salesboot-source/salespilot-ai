@@ -101,7 +101,7 @@ function ProspectCard({ prospect, index, onSave }: { prospect: ProspectResult; i
       </div>
 
       {/* Scores row */}
-      <div className="grid grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
         {prospect.ideal_client_match && (
           <div className="text-center p-2 rounded-lg bg-gradient-to-b from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
             <div className="text-sm font-bold text-indigo-400">{prospect.ideal_client_match.score}</div>
@@ -423,9 +423,9 @@ function DiscoveryContent() {
             {/* ALL RESULTS */}
             <div className="border-t border-[var(--border-subtle)] pt-6">
             {/* Sort bar */}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[12px] text-[var(--text-tertiary)]">{prospects.length} companies found</span>
-              <div className="flex gap-1 flex-wrap">
+            <div className="flex items-center justify-between mb-4 gap-3">
+              <span className="text-[12px] text-[var(--text-tertiary)] flex-shrink-0">{prospects.length} companies found</span>
+              <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
                 {([
                   ['match', 'Best Match'],
                   ['opportunity', 'Opportunity'],
