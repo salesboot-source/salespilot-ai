@@ -106,59 +106,74 @@ export default function DemoPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* AI Decision Card */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* AI Decision Card — Company Overview */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-white/10 bg-[#0B1220]/80 p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-lg font-bold">A</div>
-                <div>
-                  <h1 className="text-lg font-bold">{DEMO_COMPANY.name}</h1>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-slate-400">{DEMO_COMPANY.website}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">{DEMO_COMPANY.industry}</span>
-                  </div>
-                </div>
-              </div>
+          className="rounded-2xl border border-white/10 bg-[#0B1220]/80 backdrop-blur-xl p-5 sm:p-6 mb-6 space-y-5">
+          
+          {/* Company Identity */}
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-lg sm:text-xl font-bold flex-shrink-0 shadow-lg shadow-indigo-500/20">
+              A
             </div>
-            <div className="text-right">
-              <div className="text-amber-400 text-sm">{'★'.repeat(DEMO_COMPANY.verdict_stars)}{'☆'.repeat(5 - DEMO_COMPANY.verdict_stars)}</div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{DEMO_COMPANY.verdict_label}</span>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[18px] sm:text-[20px] font-bold truncate">{DEMO_COMPANY.name}</h1>
+              <p className="text-[12px] text-slate-400 truncate">{DEMO_COMPANY.website}</p>
             </div>
           </div>
 
-          {/* Scores */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="rounded-xl bg-gradient-to-b from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 p-3 text-center">
-              <div className="text-lg font-bold text-indigo-400">{DEMO_COMPANY.match_score}</div>
-              <div className="text-[9px] text-indigo-400/70 uppercase">Match</div>
+          {/* Badges */}
+          <div className="flex flex-wrap gap-2">
+            <span className="text-[10px] sm:text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 min-h-[28px] flex items-center">
+              {DEMO_COMPANY.industry}
+            </span>
+            <span className="text-[10px] sm:text-[11px] px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 min-h-[28px] flex items-center gap-1">
+              {'★'.repeat(DEMO_COMPANY.verdict_stars)} {DEMO_COMPANY.verdict_stars}/5
+            </span>
+            <span className="text-[10px] sm:text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 min-h-[28px] flex items-center">
+              {DEMO_COMPANY.verdict_label}
+            </span>
+          </div>
+
+          {/* Metrics Grid — 2 columns on mobile */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Match Score */}
+            <div className="rounded-xl bg-gradient-to-b from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 p-4 text-center">
+              <div className="text-[22px] sm:text-[26px] font-bold text-indigo-400">{DEMO_COMPANY.match_score}</div>
+              <div className="text-[10px] text-indigo-400/70 uppercase tracking-wider mt-0.5">Match Score</div>
             </div>
-            <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-center">
-              <div className="text-lg font-bold text-emerald-400">{DEMO_COMPANY.opportunity_score}</div>
-              <div className="text-[9px] text-slate-400 uppercase">Opportunity</div>
+            {/* Opportunity */}
+            <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4 text-center">
+              <div className="text-[22px] sm:text-[26px] font-bold text-emerald-400">{DEMO_COMPANY.opportunity_score}</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">Opportunity</div>
             </div>
-            <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-center">
-              <div className="text-sm font-bold">{DEMO_COMPANY.deal_size}</div>
-              <div className="text-[9px] text-slate-400 uppercase">Deal Size</div>
+            {/* Deal Size */}
+            <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4 text-center">
+              <div className="text-[16px] sm:text-[18px] font-bold text-white leading-tight">{DEMO_COMPANY.deal_size}</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">Deal Size</div>
             </div>
-            <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-center">
-              <div className="text-lg font-bold text-emerald-400">{DEMO_COMPANY.buying_intent}</div>
-              <div className="text-[9px] text-slate-400 uppercase">Intent</div>
+            {/* Buying Intent */}
+            <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-4 text-center">
+              <div className="text-[20px] sm:text-[24px] font-bold text-emerald-400">{DEMO_COMPANY.buying_intent}</div>
+              <div className="text-[10px] text-emerald-400/70 uppercase tracking-wider mt-0.5">Intent</div>
             </div>
-            <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-center">
-              <div className="text-sm font-bold">{DEMO_COMPANY.location}</div>
-              <div className="text-[9px] text-slate-400 uppercase">Location</div>
-            </div>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 flex-shrink-0">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" strokeLinecap="round"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <span className="text-[12px] text-slate-300">{DEMO_COMPANY.location}</span>
           </div>
         </motion.div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/5 mb-6">
+        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/5 mb-6 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
+              className={`flex-1 px-3 sm:px-4 py-2.5 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap min-h-[44px] ${
                 activeTab === tab.id ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20' : 'text-slate-400 hover:text-white'
               }`}>
               {tab.label}
